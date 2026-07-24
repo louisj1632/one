@@ -163,6 +163,13 @@
     color: #ef4444;
     font-weight: 600;
   }
+  .tag-badge {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    background: rgba(79, 70, 229, 0.12);
+    color: var(--accent);
+  }
   li button.delete {
     background: none;
     color: var(--muted);
@@ -201,6 +208,7 @@
   <div class="card">
     <form id="add-form">
       <input type="text" id="new-task" placeholder="Add a task…" autocomplete="off" autofocus>
+      <input type="text" id="new-tags" placeholder="Tags (comma separated)" autocomplete="off">
       <input type="date" id="new-due" aria-label="Due date">
       <select id="new-priority" aria-label="Priority">
         <option value="low">Low</option>
@@ -240,6 +248,7 @@
   const count = document.getElementById("count");
   const form = document.getElementById("add-form");
   const input = document.getElementById("new-task");
+  const tagsInput = document.getElementById("new-tags");
   const dueInput = document.getElementById("new-due");
   const priorityInput = document.getElementById("new-priority");
   const clearDoneBtn = document.getElementById("clear-done");
@@ -300,6 +309,13 @@
           meta.appendChild(due);
         }
 
+        for (const tag of task.tags || []) {
+          const tagBadge = document.createElement("span");
+          tagBadge.className = "tag-badge";
+          tagBadge.textContent = tag;
+          meta.appendChild(tagBadge);
+        }
+
         body.appendChild(meta);
       }
 
@@ -327,15 +343,21 @@
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
+    const tags = tagsInput.value
+      .split(",")
+      .map(t => t.trim())
+      .filter(Boolean);
     tasks.push({
       id: Date.now() + Math.random(),
       text,
       done: false,
       dueDate: dueInput.value || null,
       priority: priorityInput.value || "medium",
+      tags,
     });
     saveTasks(tasks);
     input.value = "";
+    tagsInput.value = "";
     dueInput.value = "";
     priorityInput.value = "medium";
     render();
