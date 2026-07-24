@@ -91,6 +91,14 @@
     cursor: pointer;
   }
   button:hover { opacity: 0.9; }
+  .filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .filters select {
+    flex: 1;
+  }
   ul {
     list-style: none;
     margin: 0;
@@ -217,6 +225,17 @@
       </select>
       <button type="submit">Add</button>
     </form>
+    <div class="filters">
+      <select id="filter-priority" aria-label="Filter by priority">
+        <option value="">All priorities</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+      </select>
+      <select id="filter-tag" aria-label="Filter by tag">
+        <option value="">All tags</option>
+      </select>
+    </div>
     <ul id="task-list"></ul>
     <div id="empty-state" class="empty" hidden>Nothing to do yet — add a task above.</div>
     <div class="footer">
@@ -252,6 +271,8 @@
   const dueInput = document.getElementById("new-due");
   const priorityInput = document.getElementById("new-priority");
   const clearDoneBtn = document.getElementById("clear-done");
+  const priorityFilter = document.getElementById("filter-priority");
+  const tagFilter = document.getElementById("filter-tag");
 
   function formatDueDate(dateStr) {
     const d = new Date(dateStr + "T00:00:00");
@@ -268,10 +289,35 @@
   }
 
   function render() {
-    list.innerHTML = "";
-    emptyState.hidden = tasks.length > 0;
+    const allTags = Array.from(new Set(tasks.flatMap(t => t.tags || []))).sort();
+    const previousTagValue = tagFilter.value;
+    tagFilter.textContent = "";
+    const allTagsOption = document.createElement("option");
+    allTagsOption.value = "";
+    allTagsOption.textContent = "All tags";
+    tagFilter.appendChild(allTagsOption);
+    for (const tag of allTags) {
+      const opt = document.createElement("option");
+      opt.value = tag;
+      opt.textContent = tag;
+      tagFilter.appendChild(opt);
+    }
+    tagFilter.value = allTags.includes(previousTagValue) ? previousTagValue : "";
 
-    for (const task of tasks) {
+    const activePriority = priorityFilter.value;
+    const activeTag = tagFilter.value;
+    const filtered = tasks.filter(task =>
+      (!activePriority || (task.priority || "medium") === activePriority) &&
+      (!activeTag || (task.tags || []).includes(activeTag))
+    );
+
+    list.innerHTML = "";
+    emptyState.hidden = filtered.length > 0;
+    emptyState.textContent = tasks.length === 0
+      ? "Nothing to do yet — add a task above."
+      : "No tasks match the selected filters.";
+
+    for (const task of filtered) {
       const li = document.createElement("li");
       li.className = task.done ? "done" : "";
 
@@ -333,9 +379,9 @@
       list.appendChild(li);
     }
 
-    const remaining = tasks.filter(t => !t.done).length;
-    count.textContent = tasks.length
-      ? `${remaining} of ${tasks.length} left`
+    const remaining = filtered.filter(t => !t.done).length;
+    count.textContent = filtered.length
+      ? `${remaining} of ${filtered.length} left`
       : "";
   }
 
@@ -368,6 +414,9 @@
     saveTasks(tasks);
     render();
   });
+
+  priorityFilter.addEventListener("change", render);
+  tagFilter.addEventListener("change", render);
 
   render();
 </script>
