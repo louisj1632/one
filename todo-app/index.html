@@ -53,11 +53,12 @@
   }
   form {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 16px;
   }
   input[type="text"] {
-    flex: 1;
+    flex: 1 1 160px;
     padding: 10px 12px;
     border-radius: 8px;
     border: 1px solid var(--border);
@@ -65,7 +66,18 @@
     color: var(--text);
     font-size: 14px;
   }
-  input[type="text"]:focus {
+  input[type="date"],
+  select {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+  input[type="text"]:focus,
+  input[type="date"]:focus,
+  select:focus {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
   }
@@ -89,7 +101,7 @@
   }
   li {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
     padding: 10px 8px;
     border-radius: 8px;
@@ -98,17 +110,58 @@
   li input[type="checkbox"] {
     width: 18px;
     height: 18px;
+    margin-top: 2px;
     accent-color: var(--accent);
     flex-shrink: 0;
   }
-  li span {
+  .task-body {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .task-text {
     font-size: 14px;
     word-break: break-word;
   }
-  li.done span {
+  li.done .task-text {
     text-decoration: line-through;
     color: var(--done);
+  }
+  .task-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .priority-badge {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .priority-high {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+  }
+  .priority-medium {
+    background: rgba(245, 158, 11, 0.15);
+    color: #d97706;
+  }
+  .priority-low {
+    background: rgba(107, 114, 128, 0.15);
+    color: var(--muted);
+  }
+  .due-date {
+    color: var(--muted);
+  }
+  .due-date.overdue {
+    color: #ef4444;
+    font-weight: 600;
   }
   li button.delete {
     background: none;
@@ -116,6 +169,7 @@
     padding: 4px 8px;
     font-size: 16px;
     line-height: 1;
+    margin-top: 1px;
   }
   li button.delete:hover { color: #ef4444; }
   .empty {
@@ -147,6 +201,12 @@
   <div class="card">
     <form id="add-form">
       <input type="text" id="new-task" placeholder="Add a task…" autocomplete="off" autofocus>
+      <input type="date" id="new-due" aria-label="Due date">
+      <select id="new-priority" aria-label="Priority">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+      </select>
       <button type="submit">Add</button>
     </form>
     <ul id="task-list"></ul>
@@ -180,7 +240,23 @@
   const count = document.getElementById("count");
   const form = document.getElementById("add-form");
   const input = document.getElementById("new-task");
+  const dueInput = document.getElementById("new-due");
+  const priorityInput = document.getElementById("new-priority");
   const clearDoneBtn = document.getElementById("clear-done");
+
+  function formatDueDate(dateStr) {
+    const d = new Date(dateStr + "T00:00:00");
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
+  function isOverdue(task) {
+    if (!task.dueDate || task.done) return false;
+    const today = new Date();
+    const todayStr = today.getFullYear() + "-" +
+      String(today.getMonth() + 1).padStart(2, "0") + "-" +
+      String(today.getDate()).padStart(2, "0");
+    return task.dueDate < todayStr;
+  }
 
   function render() {
     list.innerHTML = "";
@@ -199,8 +275,33 @@
         render();
       });
 
+      const body = document.createElement("div");
+      body.className = "task-body";
+
       const span = document.createElement("span");
+      span.className = "task-text";
       span.textContent = task.text;
+      body.appendChild(span);
+
+      const priority = task.priority || "medium";
+      if (priority || task.dueDate) {
+        const meta = document.createElement("div");
+        meta.className = "task-meta";
+
+        const badge = document.createElement("span");
+        badge.className = `priority-badge priority-${priority}`;
+        badge.textContent = priority;
+        meta.appendChild(badge);
+
+        if (task.dueDate) {
+          const due = document.createElement("span");
+          due.className = "due-date" + (isOverdue(task) ? " overdue" : "");
+          due.textContent = (isOverdue(task) ? "Overdue: " : "Due ") + formatDueDate(task.dueDate);
+          meta.appendChild(due);
+        }
+
+        body.appendChild(meta);
+      }
 
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "delete";
@@ -212,7 +313,7 @@
         render();
       });
 
-      li.append(checkbox, span, deleteBtn);
+      li.append(checkbox, body, deleteBtn);
       list.appendChild(li);
     }
 
@@ -226,9 +327,17 @@
     e.preventDefault();
     const text = input.value.trim();
     if (!text) return;
-    tasks.push({ id: Date.now() + Math.random(), text, done: false });
+    tasks.push({
+      id: Date.now() + Math.random(),
+      text,
+      done: false,
+      dueDate: dueInput.value || null,
+      priority: priorityInput.value || "medium",
+    });
     saveTasks(tasks);
     input.value = "";
+    dueInput.value = "";
+    priorityInput.value = "medium";
     render();
   });
 
